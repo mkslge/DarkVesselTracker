@@ -30,6 +30,7 @@ add_executable(VesselDetect main.cpp
         IngestionLayer/IngestionLayer.h
         IngestionLayer/SpatialIndex.h
         IngestionLayer/PortLoader.h
+        IngestionLayer/Port.h
 )
 
 add_executable(testDataSource

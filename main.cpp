@@ -5,7 +5,7 @@
 int main() {
     CSVDataSource source("/Users/markseeliger/Coding/VesselDetect/data/AIS_2024_12_29.csv");
     SpatialIndex spatialIndex;
-    PortLoader::loadPortsFromCSV("/Users/markseeliger/Coding/VesselDetect/data/ports.csv", spatialIndex);
+    PortLoader::loadPortsFromCSV("/Users/markseeliger/Coding/VesselDetect/data/port_dataset.csv", spatialIndex);
 
     VesselTracker tracker(spatialIndex, 3600);
     source.start([&tracker](const PositionUpdate& update) {

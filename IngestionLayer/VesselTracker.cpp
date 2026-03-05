@@ -65,7 +65,7 @@ void VesselTracker::updateVessel(const PositionUpdate update) {
                   << "  reappeared_at=" << update.timestamp << "\n";
         state.in_dark_event = false;
 
-    } else if (delta_time > darkThreshold_ && !spatialIndex_.isNearPort(update.lat, update.lon, 3000)) {
+    } else if (delta_time > darkThreshold_ && !spatialIndex_.isNearPort(update.lat, update.lon, 10000)) {
         // Gap exceeds threshold — start a dark event
         std::cout << "[DARK START] MMSI=" << update.mmsi
                   << "  last_seen=" << state.last_timestamp
