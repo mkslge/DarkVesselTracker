@@ -5,7 +5,7 @@
 #ifndef PORTLOADER_H
 #define PORTLOADER_H
 
-#include "SpatialIndex.h"
+#include "../IngestionLayer/SpatialIndex.h"
 #include <fstream>
 #include <sstream>
 #include <stdexcept>

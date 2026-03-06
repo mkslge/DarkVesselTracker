@@ -11,9 +11,15 @@
 
 struct VesselState {
     uint64_t last_timestamp;
+
+
     double last_lat;
     double last_lon;
     double last_sog;
+
+    double prev_lat;
+    double prev_lon;
+
     bool in_dark_event = false;
 };
 

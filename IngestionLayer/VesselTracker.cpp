@@ -7,6 +7,7 @@
 
 #include "VesselTracker.h"
 #include <iostream>
+#include <utility>
 
 #include "SpatialIndex.h"
 
@@ -31,12 +32,13 @@
 // ---------------------------------------------------------------------------
 
 
-VesselTracker::VesselTracker(SpatialIndex &spatialIndex, std::uint64_t darkThresholdSeconds)
-    : spatialIndex_(spatialIndex), darkThreshold_(darkThresholdSeconds)
-{}
+VesselTracker::VesselTracker(SpatialIndex spatialIndex, std::uint64_t darkThresholdSeconds)
+    : spatialIndex_(std::move(spatialIndex)), darkThreshold_(darkThresholdSeconds) {
+    running = true;
+}
 
-void VesselTracker::updateVessel(const PositionUpdate update) {
-
+void VesselTracker::updateVessel(const PositionUpdate& update) {
+    std::lock_guard<std::mutex> lg(vessels_mutex_);
     auto it = vessels_.find(update.mmsi);
 
     if (it == vessels_.end()) {
@@ -60,20 +62,23 @@ void VesselTracker::updateVessel(const PositionUpdate update) {
 
     if (state.in_dark_event) {
         // Vessel has reappeared — end the dark event
-        std::cout << "[DARK END]   MMSI=" << update.mmsi
+        /*std::cout << "[DARK END]   MMSI=" << update.mmsi
                   << "  silent_for=" << delta_time << "s"
-                  << "  reappeared_at=" << update.timestamp << "\n";
+                  << "  reappeared_at=" << update.timestamp << "\n";*/
         state.in_dark_event = false;
 
     } else if (delta_time > darkThreshold_ && !spatialIndex_.isNearPort(update.lat, update.lon, 10000)) {
         // Gap exceeds threshold — start a dark event
-        std::cout << "[DARK START] MMSI=" << update.mmsi
+        /*std::cout << "[DARK START] MMSI=" << update.mmsi
                   << "  last_seen=" << state.last_timestamp
-                  << "  gap=" << delta_time << "s\n";
+                  << "  gap=" << delta_time << "s\n";*/
         state.in_dark_event = true;
     }
 
     // Always update the stored state with the latest ping
+    state.prev_lat = state.last_lat;
+    state.prev_lon = state.last_lon;
+
     state.last_timestamp = update.timestamp;
     state.last_lat        = update.lat;
     state.last_lon        = update.lon;
@@ -85,7 +90,7 @@ void VesselTracker::reviewDarkEvents(uint64_t ts) {
     // wall-clock time so we can catch vessels that simply stopped transmitting
     // rather than waiting for a future update to trigger the dark-start logic.
     //
-    // Typically you would pass the current timestamp in; here we accept it
+    // Typically, you would pass the current timestamp in; here we accept it
     // via a parameter-less signature as required by the original header, so
     // callers should invoke it regularly from a thread/timer.
     //
@@ -107,3 +112,66 @@ void VesselTracker::reviewDarkEvents(uint64_t ts) {
 }
 
 
+void VesselTracker::darkEventScanner(uint64_t current_ts)
+{
+    std::lock_guard<std::mutex> lock(vessels_mutex_);
+
+    for (auto& [mmsi, state] : vessels_) {
+
+        if (state.in_dark_event)
+            continue;
+
+        uint64_t delta = current_ts - state.last_timestamp;
+
+        if (delta > darkThreshold_) {
+
+            DarkEvent ev;
+            ev.mmsi = mmsi;
+            ev.start_time = state.last_timestamp;
+            ev.last_lat = state.last_lat;
+            ev.last_lon = state.last_lon;
+            ev.active = true;
+
+            state.in_dark_event = true;
+
+            queue_.push(ev);
+        }
+    }
+}
+
+
+void VesselTracker::eventProcessor()
+{
+    while (running.load()) {
+
+        DarkEvent ev;
+
+        if (queue_.try_pop(ev)) {
+            std::cout << "Processing event in queue..." << std::endl;
+            std::cout << "[DARK EVENT]\n";
+            std::cout << "MMSI: " << ev.mmsi << "\n";
+            std::cout << "Started: " << ev.start_time << "\n";
+            std::cout << "Location: "
+                      << ev.last_lat << ", "
+                      << ev.last_lon << "\n\n";
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+    }
+}
+
+
+void VesselTracker::monitorLoop() {
+    uint64_t now = latest_ts_.load();
+    while (running.load()) {
+        std::cout << "In monitor loop, calling darkEventScanner..." << std::endl;
+        darkEventScanner(now);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+}
+
+
+void VesselTracker::stop() {
+    running = false;
+}

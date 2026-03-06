@@ -1,24 +1,27 @@
 #include <iostream>
+#include <thread>
+
 #include "DataSource/CSVDataSource.h"
 #include "IngestionLayer/VesselTracker.h"
-#include "IngestionLayer/PortLoader.h"
+#include "PortLoading/PortLoader.h"
 int main() {
     CSVDataSource source("/Users/markseeliger/Coding/VesselDetect/data/AIS_2024_12_29.csv");
     SpatialIndex spatialIndex;
     PortLoader::loadPortsFromCSV("/Users/markseeliger/Coding/VesselDetect/data/port_dataset.csv", spatialIndex);
 
     VesselTracker tracker(spatialIndex, 3600);
-    source.start([&tracker](const PositionUpdate& update) {
+
+    std::thread monitor(&VesselTracker::monitorLoop, &tracker);
+    std::thread dark_event_scanner(&VesselTracker::eventProcessor, &tracker);
+    long long vessel_events = 0;
+    source.start([&tracker, &vessel_events](const PositionUpdate& update) {
+        //std::cout << "Processed " << vessel_events++ << " Vessel events..." << std::endl;
         tracker.updateVessel(update);
-        /*std::cout << "Vessel: " << update.mmsi
-                  << " @ (" << update.lat << ", "
-                  << update.lon << ")"
-                  << " speed=" << update.sog
-                  << " time=" << update.timestamp
-                  << "\n";*/
     });
-    tracker.reviewDarkEvents(0);
-    return 0;
+    tracker.stop();
+    monitor.join();
+    dark_event_scanner.join();
+
 
     return 0;
 }

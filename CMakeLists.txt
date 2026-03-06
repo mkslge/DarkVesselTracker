@@ -16,21 +16,12 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 
 
-
 add_library(DataSource DataSource/CSVDataSource.cpp
-        DataSource/CSVDataSource.h
-        DataSource/IDataSource.h
-        DataSource/PositionUpdate.h
         IngestionLayer/VesselTracker.cpp
-        IngestionLayer/VesselTracker.h
 )
 
 add_executable(VesselDetect main.cpp
-        IngestionLayer/VesselState.h
-        IngestionLayer/IngestionLayer.h
-        IngestionLayer/SpatialIndex.h
-        IngestionLayer/PortLoader.h
-        IngestionLayer/Port.h
+
 )
 
 add_executable(testDataSource
